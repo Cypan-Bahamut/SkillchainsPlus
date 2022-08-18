@@ -262,8 +262,6 @@ function check_sc()
 
 end
 
-print(petopen)
-
 function ws_delay()
 
   wsdelay = 1

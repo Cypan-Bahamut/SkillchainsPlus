@@ -1,3 +1,10 @@
+# Requirements
+
+All files including the data folder, nukes, skills, and skillchainsplus are required to function correctly.
+
+Upon initial load - a new character.lua file will be generated to allow character specific weaponskill settings.
+
+
 # SkillChains - Original Addon
 ### Active Battle Skillchain Display.
 
