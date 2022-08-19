@@ -84,7 +84,6 @@ function varclean()
     w_readies = 0
 
     tagtime = os.clock()
-    conduct = 0
 
     openws = nil
     petopen = nil
@@ -1259,16 +1258,6 @@ windower.register_event(
     local player = windower.ffxi.get_player()
     local pname = player.name
 
-    if original:contains("conducts a rousing symphony") and conduct == 0 then
-      if not original:contains(pname) then
-        windower.send_command('input /jobemote brd;wait 5;input //sc conduct')
-        conduct = 1
-      else
-        windower.send_command('wait 5;input //sc conduct')
-        conduct = 1
-      end
-    end
-
     return modified, mode
 end)
 
@@ -1974,10 +1963,6 @@ windower.register_event('addon command', function(cmd, ...)
         else
             yonin = 1
             windower.add_to_chat(207, '%s: Yonin Mode: On':format(_addon.name))
-        end
-    elseif cmd == 'conduct' then
-        if conduct == 1 then
-            conduct = 0
         end
     elseif cmd == 'whilecasting' then
         if w_casting == 1 then
