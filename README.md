@@ -76,6 +76,7 @@ Skillchain behavior modifiers
     //sc open        Only opens skillchains with defaultws and does not close.
     //sc close       Only closes skillchains and does not open.
     //sc endless     Forces using a level 2 or level 1 skillchain if available.
+    //sc spamsc      Spams defined spamws at 1000 TP but waits if spamws can close current skillchain.
     //sc ultimate    Only closes if it can make a level 4 skillchain.
     //sc starter     Uses starterws once per battle to open.
     //sc melee       Forces only melee weaponskills for skillchains.
