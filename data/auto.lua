@@ -16,6 +16,10 @@ function jobvar()
 -- preferws:  preferred weaponskill used to close a skillchain
 -- amws:      mythic weaponskill used for keeping AM3 buff up
 
+-- Weapon-type based WS avoidance
+-- Keys are weapon types (derived from item skill)
+-- Values are sets of WS names to exclude for that weapon type
+-- Empty sets mean "allow everything"
 
 -- DRAGOON
 
@@ -23,7 +27,7 @@ function jobvar()
         defaultws = {'Stardiver',"Savage Blade","Retribution"}
         tpws = {}
         spamws = {'Stardiver',"Savage Blade","Retribution"}
-        cleavews = {}
+        avoidws = {}
         starterws = {'Stardiver',"Savage Blade","Retribution"}
         preferws = {'Stardiver',"Savage Blade","Retribution"}
         amws = 'Drakesbane'
@@ -36,7 +40,7 @@ function jobvar()
         defaultws = {'Tornado Kick'}
         tpws = {'Howling Fist'}
         spamws = {}
-        cleavews = {}
+        avoidws = {}
         starterws = {'Tornado Kick'}
         preferws = {'Tornado Kick'}
         amws = 'Ascetic\'s Fury'
@@ -49,7 +53,7 @@ function jobvar()
         defaultws = {'Shijin Spiral'}
         tpws = {'Howling Fist'}
         spamws = {}
-        cleavews = {}
+        avoidws = {}
         starterws = {'Shijin Spiral'}
         preferws = {'Shijin Spiral'}
         amws = 'Stringing Pummel'
@@ -62,7 +66,7 @@ function jobvar()
         defaultws = {'Pyrrhic Kleos'}
         tpws = {'Rudra\'s Storm'}
         spamws = {'Rudra\'s Storm'}
-        cleavews = {}
+        avoidws = {}
         starterws = {'Shark Bite'}
         preferws = {'Rudra\'s Storm'}
         amws = 'Pyrrhic Kleos'
@@ -75,7 +79,7 @@ function jobvar()
         defaultws = {'Dimidiation'}
         tpws = {}
         spamws = {}
-        cleavews = {}
+        avoidws = {}
         starterws = {'Dimidiation'}
         preferws = {'Dimidiation'}
         amws = 'Dimidiation'
@@ -88,7 +92,7 @@ function jobvar()
         defaultws = {'Evisceration'}
         tpws = {}
         spamws = {'Rudra\'s Storm','Savage Blade'}
-        cleavews = {}
+        avoidws = {}
         starterws = {'Evisceration'}
         preferws = {'Evisceration'}
         amws = 'Mandalic Stab'
@@ -101,7 +105,7 @@ function jobvar()
         defaultws = {'Torcleaver','Catastrophe','Cross Reaper'}
         tpws = {}
         spamws = {'Torcleaver','Catastrophe','Cross Reaper'}
-        cleavews = {}
+        avoidws = {}
         starterws = {'Torcleaver','Catastrophe','Cross Reaper'}
         preferws = {'Torcleaver','Catastrophe','Cross Reaper'}
         amws = 'Insurgency'
@@ -114,7 +118,7 @@ function jobvar()
         defaultws = {'Vidohunir'}
         tpws = {'Full Swing'}
         spamws = {'Vidohunir'}
-        cleavews = {}
+        avoidws = {}
         starterws = {'Vidohunir'}
         preferws = {'Vidohunir'}
         amws = 'Vidohunir'
@@ -127,7 +131,7 @@ function jobvar()
         defaultws = {'Leaden Salute'}
         tpws = {}
         spamws = {}
-        cleavews = {}
+        avoidws = {}
         starterws = {'Leaden Salute'}
         preferws = {'Leaden Salute'}
         amws = 'Leaden Salute'
@@ -140,7 +144,7 @@ function jobvar()
         defaultws = {'Tachi: Fudo'}
         tpws = {'Tachi: Fudo'}
         spamws = {'Tachi: Fudo'}
-        cleavews = {}
+        avoidws = {}
         starterws = {'Tachi: Shoha'}
         preferws = {'Tachi: Shoha'}
         amws = 'Tachi: Rana'
@@ -153,7 +157,7 @@ function jobvar()
         defaultws = {'Savage Blade','Rudra\'s Storm'}
         tpws = {}
         spamws = {'Savage Blade','Rudra\'s Storm'}
-        cleavews = {}
+        avoidws = {}
         starterws = {'Savage Blade','Rudra\'s Storm'}
         preferws = {'Savage Blade','Rudra\'s Storm'}
         amws = 'Mordant Rime'
@@ -166,7 +170,7 @@ function jobvar()
         defaultws = {}
         tpws = {}
         spamws = {}
-        cleavews = {}
+        avoidws = {}
         starterws = {}
         preferws = {}
         amws = 'Expiacion'
@@ -179,7 +183,7 @@ function jobvar()
         defaultws = {'Upheaval','Savage Blade','Full Break'}
         tpws = {}
         spamws = {'Upheaval'}
-        cleavews = {}
+        avoidws = {}
         starterws = {'Upheaval','Savage Blade','Full Break'}
         preferws = {'Upheaval','Savage Blade','Full Break'}
         amws = 'King\'s Justice'
@@ -192,7 +196,7 @@ function jobvar()
         defaultws = {'Black Halo'}
         tpws = {}
         spamws = {'Black Halo'}
-        cleavews = {}
+        avoidws = {}
         starterws = {'Black Halo'}
         preferws = {'Black Halo'}
         amws = 'Mystic Boon'
@@ -205,7 +209,7 @@ function jobvar()
         defaultws = {'Death Blossom','Savage Blade'}
         tpws = {}
         spamws = {'Savage Blade'}
-        cleavews = {}
+        avoidws = {}
         starterws = {'Death Blossom','Savage Blade'}
         preferws = {'Death Blossom','Savage Blade'}
         amws = 'Death Blossom'
@@ -218,7 +222,7 @@ function jobvar()
         defaultws = {'Red Lotus Blade'}
         tpws = {}
         spamws = {'Savage Blade'}
-        cleavews = {}
+        avoidws = {}
         starterws = {'Red Lotus Blade'}
         preferws = {'Red Lotus Blade'}
         amws = 'Atonement'
@@ -231,7 +235,7 @@ function jobvar()
         defaultws = {'Blade: Shun'}
         tpws = {}
         spamws = {'Blade: Hi'}
-        cleavews = {}
+        avoidws = {}
         starterws = {'Blade: Shun'}
         preferws = {'Blade: Ku'}
         amws = 'Blade: Kamu'
@@ -244,7 +248,7 @@ function jobvar()
         defaultws = {}
         tpws = {}
         spamws = {}
-        cleavews = {}
+        avoidws = {}
         starterws = {}
         preferws = {}
         amws = 'Exudation'
@@ -257,7 +261,7 @@ function jobvar()
         defaultws = {}
         tpws = {}
         spamws = {}
-        cleavews = {}
+        avoidws = {}
         starterws = {}
         preferws = {}
         amws = 'Trueflight'
@@ -270,7 +274,7 @@ function jobvar()
         defaultws = {}
         tpws = {}
         spamws = {}
-        cleavews = {}
+        avoidws = {}
         starterws = {}
         preferws = {}
         amws = 'Primal Rend'
@@ -284,7 +288,7 @@ function jobvar()
         defaultws = {'Black Halo'}
         tpws = {}
         spamws = {'Black Halo'}
-        cleavews = {}
+        avoidws = {}
         starterws = {'Black Halo'}
         preferws = {'Black Halo'}
         amws = 'Omniscience'
@@ -297,7 +301,7 @@ function jobvar()
         defaultws = {'Garland of Bliss'}
         tpws = {}
         spamws = {'Garland of Bliss'}
-        cleavews = {}
+        avoidws = {}
         starterws = {'Garland of Bliss'}
         preferws = {'Garland of Bliss'}
         amws = 'Garland of Bliss'
