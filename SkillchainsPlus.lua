@@ -495,6 +495,12 @@ dnc_ws_context = nil -- 'spam' | 'auto_open' | 'auto_close' | nil
 dnc_step_rotation_mode = false
 dnc_step_index = 0
 dnc_prews_last = dnc_prews_last or 0
+-- /DNC subjob steps mode: 0 off (default) | 1 Box Step only | 2 rotation.
+-- Sub cap 59: no Presto (DNC77), no Feather Step (DNC83), flourishes unused.
+dnc_sub_steps = 0
+-- While a sub step+WS chain is pending, hold WS retries: the 0.34s retry
+-- otherwise fires a plain WS mid-chain, draining TP before the step lands.
+dnc_sub_chain_until = 0
 
 -- DNC flourish mapping for pre-WS automation (edit this list)
 local dnc_flourish_map = {
@@ -609,6 +615,17 @@ local function dnc_next_step_name()
     end
 
     local steps = {'Box Step','Quickstep','Feather Step'}
+    local name = steps[(dnc_step_index % #steps) + 1]
+    dnc_step_index = (dnc_step_index + 1) % #steps
+    return name
+end
+
+-- /DNC sub step choice: Box Step only, or main-style rotation sans Feather Step
+local function dnc_sub_next_step_name()
+    if dnc_sub_steps ~= 2 then
+        return 'Box Step'
+    end
+    local steps = {'Box Step','Quickstep'}
     local name = steps[(dnc_step_index % #steps) + 1]
     dnc_step_index = (dnc_step_index + 1) % #steps
     return name
@@ -1113,6 +1130,7 @@ function varclean()
     sc_ebul_mode = 0
     sc_alac_mode = 0
     sc_cascade_mode = 0
+    sc_futae_mode = 0
 
     -- NIN Wheel (San spam) state
     wheel = 0
@@ -1124,6 +1142,14 @@ function varclean()
     wheel_last_delay = 0
     wheel_cast_lock_until = 0
 
+    -- Confirmation latch: set when a wheel cast is observed to start; cleared
+    -- on completion (action packet / "casts" text / damage fallback),
+    -- interruption, target reset, mode toggle, or an 8s recovery timeout.
+    -- While set, wheel_tick may not open a new retry window. This prevents
+    -- the same-element tier fallback (San on recast -> Ni) that fired when
+    -- completion confirmation lagged past the timer-based cast lock.
+    wheel_started_spell = nil
+    wheel_started_at = 0
 
     -- Wheel inflight tracking (prevents re-sending the same spell before server confirms)
     wheel_inflight = 0
@@ -3684,10 +3710,15 @@ windower.register_event(
     local player = windower.ffxi.get_player()
     local pname = player and player.name or nil
 
+    -- Wheel text matching uses a control-byte-stripped copy: in-game lines can
+    -- carry color/autotranslate bytes between segments, which break substring
+    -- matches against the raw line (same normalization as the nuke handler).
+    local worig = original and original:gsub('[%z\1-\31\127\128-\255]', '') or ''
+
     -- Wheel: if we use a weaponskill, allow the next wheel cast attempts to begin after the 2s WS forced delay window
     -- (wheel still relies on retry to bridge latency and any remaining action lockouts).
     if wheel == 1 and pname then
-        if original:contains(pname .. " uses ") or original:contains("You use ") then
+        if worig:contains(pname .. " uses ") or worig:contains("You use ") then
             local now = os.clock()
             -- start attempts slightly early; retry loop will handle exact readiness
             wheel_cast_lock_until = now + 1.8
@@ -3705,14 +3736,18 @@ windower.register_event(
 
 
     -- Stop wheel retry spam as soon as we actually begin casting the wheel spell.
-    if wheel == 1 and pname and (wheel_retry_pending == 1 or (wheel_retry_attempts or 0) > 0) then
-        if original:contains(pname .. " starts casting") then
+    -- (QA+1 2026-08-16, Q1) Not gated on retry-pending: an action-confirm for
+    -- a previous/manual ninjutsu landing between our send-accept and this text
+    -- clears retry first, which previously skipped the latch entirely and
+    -- reopened the same-element refire hole. wheel_retry_clear is idempotent.
+    if wheel == 1 and pname then
+        if worig:contains(pname .. " starts casting") then
             local matched = false
-            if wheel_last_sent_spell and original:contains(wheel_last_sent_spell) then
+            if wheel_last_sent_spell and worig:contains(wheel_last_sent_spell) then
                 matched = true
             elseif wheel_last_choices then
                 for _, nm in ipairs(wheel_last_choices) do
-                    if original:contains(nm) then
+                    if worig:contains(nm) then
                         wheel_last_sent_spell = nm
                         wheel_last_spell = nm
                         wheel_last_delay = wheel_delay_for_spell(nm)
@@ -3732,6 +3767,11 @@ windower.register_event(
                 -- wheel_last_advance_stamp so the 1.0s guard on those completion paths
                 -- isn't preemptively triggered by an event that didn't actually advance.
                 if adv_spell then
+                    -- Latch the started cast; wheel_tick holds here until a
+                    -- completion/interruption path (or timeout) clears it.
+                    wheel_started_spell = adv_spell
+                    wheel_started_at = now2
+
                     wheel_retry_clear()
 
                     -- Respect the cast lock window for the spell we just started
@@ -3744,19 +3784,28 @@ windower.register_event(
         end
     end
 
+    -- Interruption releases the confirmation latch so wheel_tick can resume
+    -- attempts for the element promptly instead of waiting out the timeout.
+    if wheel == 1 and pname and wheel_started_spell then
+        if worig:contains(pname) and worig:contains('casting is interrupted') then
+            wheel_started_spell = nil
+            wheel_started_at = 0
+        end
+    end
+
     -- If we missed "starts casting" (chat filtered/scroll), still advance on successful completion.
     if wheel == 1 and pname then
-        if original:contains(pname .. " casts ") then
+        if worig:contains(pname .. " casts ") then
             local now2 = os.clock()
             for i = 1, 6 do
                 local base = wheel_bases[i]
                 if base then
                     local tier = nil
-                    if original:contains(base .. ': San') then
+                    if worig:contains(base .. ': San') then
                         tier = 'San'
-                    elseif original:contains(base .. ': Ni') then
+                    elseif worig:contains(base .. ': Ni') then
                         tier = 'Ni'
-                    elseif original:contains(base .. ': Ichi') then
+                    elseif worig:contains(base .. ': Ichi') then
                         tier = 'Ichi'
                     end
 
@@ -3773,6 +3822,12 @@ windower.register_event(
                             wheel_last_sent_spell = spell
                             wheel_last_spell = spell
                             wheel_last_delay = wheel_delay_for_spell(spell)
+
+                            -- Cast completed: release the confirmation latch.
+                            if wheel_started_spell == spell then
+                                wheel_started_spell = nil
+                                wheel_started_at = 0
+                            end
 
                             -- Advance wheel_idx as a fallback for when the action packet was
                             -- missed. Skip when force-element pin is active (matches the action
@@ -3823,10 +3878,15 @@ windower.register_event(
             -- suffix and would false-trigger every melee hit while wheel is active.
             -- Melee/ranged hits use "<actor> hits X for Y points of damage" (no
             -- " takes "), so the " takes " requirement already filters those.
-            local is_spell_dmg = original:contains(' takes ')
-                                 and original:contains(' points of damage')
-                                 and not original:contains('Additional effect')
-            if is_spell_dmg then
+            local is_spell_dmg = worig:contains(' takes ')
+                                 and worig:contains(' points of damage')
+                                 and not worig:contains('Additional effect')
+            -- Only treat damage as confirmation for a cast that actually
+            -- started (latch set for it). Without this, unrelated party or
+            -- trust damage lines inside the 3.5s window can confirm — and
+            -- advance past — a send that was never accepted (e.g. "Cypan
+            -- takes 0 points of damage" landing during a failed-send bridge).
+            if is_spell_dmg and wheel_started_spell == wheel_send_spell then
                 local spell = wheel_send_spell
                 if not (wheel_last_advance_spell == spell and (now2 - (wheel_last_advance_stamp or 0)) < 1.0) then
                     wheel_last_advance_spell = spell
@@ -3838,6 +3898,12 @@ windower.register_event(
                     local mi = wheel_idx_for_spell(spell)
                     if mi and not nukespam_force_ele then
                         wheel_idx = (mi % 6) + 1
+                    end
+
+                    -- Cast resolved with damage: release the confirmation latch.
+                    if wheel_started_spell == spell then
+                        wheel_started_spell = nil
+                        wheel_started_at = 0
                     end
 
                     -- Clear inflight; cast clearly resolved with damage.
@@ -3947,6 +4013,12 @@ windower.register_event('action', function(act)
         -- Note: msg_id 85 (resisted) is treated as completion, not interruption — resisted
         -- spells still consume MP and start the recast. Real interruptions arrive as
         -- category 8 packets (param 28787) and are filtered out at the category check above.
+        -- Server-confirmed completion of this spell: release the latch.
+        if wheel_started_spell == en then
+            wheel_started_spell = nil
+            wheel_started_at = 0
+        end
+
         wheel_inflight = 0
         wheel_inflight_spell = nil
         wheel_inflight_base = nil
@@ -3969,9 +4041,14 @@ windower.register_event('action', function(act)
         end
 
         -- Clear send-time tracking so the damage-line fallback doesn't fire
-        -- redundantly on the same cast's damage line.
-        wheel_send_time = 0
-        wheel_send_spell = nil
+        -- redundantly on the same cast's damage line. Conditional on spell
+        -- match: a manual/burst ninjutsu completing must not erase tracking
+        -- for a different wheel cast still in flight (2026-08-15 log: manual
+        -- Katon: San completion cleared the pending wheel Suiton: San state).
+        if wheel_send_spell == nil or wheel_send_spell == en then
+            wheel_send_time = 0
+            wheel_send_spell = nil
+        end
     end
 
     if act.param then
@@ -4115,6 +4192,14 @@ function perform_ws(ws_name)
     local player = windower.ffxi.get_player()
     if not player then return end
 
+    -- /DNC sub step chain pending: swallow this attempt entirely. The chained
+    -- WS fires on its own wait 1; a plain WS here would beat the step to the
+    -- server and strip the TP it needs. Retries resume after the window.
+    if dnc_sub_chain_until and os.clock() < dnc_sub_chain_until then
+        dnc_ws_context = nil
+        return
+    end
+
     -- Prevent long chained command strings from stacking and locking input
     if (os.clock() - dnc_prews_last) < 0.6 then
         windower.send_command('input /ws '..ws_name..' <t>')
@@ -4241,6 +4326,29 @@ function perform_ws(ws_name)
             if pre then
                 dnc_prews_last = os.clock()
                 windower.send_command(pre .. ';input /ws '..ws_name..' <t>')
+                ws_mark_inflight()
+                ws_attempt_throttle()
+                dnc_ws_context = nil
+                return
+            end
+        end
+    elseif player.sub_job == 'DNC' and dnc_sub_steps > 0 and nosteps == 0 then
+        -- /DNC sub: weave one step before spam/opener WS. No Presto, no flourishes.
+        local cur_tp = (player.vitals and player.vitals.tp) or player.tp or 0
+        local am_mode = (am == 1)
+        local am3_active = has_buff_name('Aftermath: Lv.3')
+        local allow_steps = (not am_mode) or am3_active
+        if am_mode and cur_tp >= 3000 then allow_steps = false end
+        if allow_steps and cur_tp >= 1100
+                and (dnc_ws_context == 'spam' or dnc_ws_context == 'auto_open')
+                and dnc_ja_ready('Box Step') then
+            local rem = dnc_sc_seconds_remaining()
+            local max_prejas = dnc_max_prejas_for_window(rem)
+            if max_prejas == nil or max_prejas >= 1 then
+                local step_name = dnc_sub_next_step_name()
+                dnc_prews_last = os.clock()
+                dnc_sub_chain_until = os.clock() + 1.4
+                windower.send_command('input /ja "' .. step_name .. '" <t>;wait 1;input /ws '..ws_name..' <t>')
                 ws_mark_inflight()
                 ws_attempt_throttle()
                 dnc_ws_context = nil
@@ -4543,6 +4651,14 @@ local function wheel_schedule_retry()
             wheel_retry_timer = coroutine.schedule(wheel_retry_attempt, (wheel_retry_base_delay or 0.34))
             return
         end
+        -- A wheel cast already started and is unconfirmed: stop this retry
+        -- window outright; wheel_tick re-opens after confirmation. (Safe to
+        -- call wheel_retry_clear from inside the running attempt: close()
+        -- only fires on a suspended coroutine, and this one is running.)
+        if wheel_started_spell then
+            wheel_retry_clear()
+            return
+        end
         wheel_send_cast()
         wheel_retry_timer = coroutine.schedule(wheel_retry_attempt, (wheel_retry_base_delay or 0.34))
     end
@@ -4570,6 +4686,8 @@ local function wheel_tick(now)
         wheel_last_choices = nil
         wheel_last_delay = 0
         wheel_cast_lock_until = 0
+        wheel_started_spell = nil
+        wheel_started_at = 0
         wheel_retry_clear()
     end
 
@@ -4599,6 +4717,20 @@ local function wheel_tick(now)
         if now < ((wheel_cast_lock_until or 0) - lead) then
             return
         end
+    end
+
+    -- Confirmation gate: a wheel cast has started but no completion or
+    -- interruption has been confirmed yet. Opening a new retry window here
+    -- is what produced the same-element San -> Ni refire (2026-08-15 log):
+    -- with San's recast active, the tier fallback picked Ni for the element
+    -- still pointed to by wheel_idx. Hold until a confirmation path clears
+    -- the latch; the 8s timeout recovers from lost confirmations.
+    if wheel_started_spell then
+        if (now - (wheel_started_at or 0)) < 8.0 then
+            return
+        end
+        wheel_started_spell = nil
+        wheel_started_at = 0
     end
 
     -- If we're already trying, let the retry loop run
@@ -4822,6 +4954,10 @@ local function sc_select_preburst_ja()
     local p = windower.ffxi.get_player()
     if not p then return nil end
 
+    if sc_futae_mode == 1 and p.main_job == 'NIN' and sc_player_has_ja('Futae') and dnc_ja_ready('Futae') then
+        return 'Futae'
+    end
+
     if sc_cascade_mode == 1 and p.main_job == 'BLM' and sc_player_has_ja('Cascade') and dnc_ja_ready('Cascade') then
         return 'Cascade'
     end
@@ -4850,7 +4986,7 @@ nuke_handle_step2_rise = function(now)
         windower.send_command('input /ja "' .. ja_name .. '" <me>')
         nuke_preburst_ja_name = ja_name
         nuke_preburst_ja_sent_at = now
-        nuke_preburst_first_attempt_at = now + 0.1
+        nuke_preburst_first_attempt_at = now + (ja_name == 'Futae' and 0.6 or 0.1)
         nuke_preburst_probe_until = now + 1.35
         nuke_mb_last_tick = 0
         return
@@ -5170,7 +5306,7 @@ function apply_properties(target, resource, action_id, properties, delay, step, 
     -- Immediate GearSwap burst push when SC reaches step 2+.
     -- This is specifically to allow midcast regear (GearSwap force_midcast_regear) to swap into MB sets
     -- without waiting for the normal 1.5s nuke window.
-    if target == targ_id and step and step > 1 and info and info.job == 'BLM' then
+    if target == targ_id and step and step > 1 and info and (info.job == 'BLM' or info.job == 'NIN') then
         if resonating[target].burst_sent ~= 1 then
             resonating[target].burst_sent = 1
             resonating[target].gs_mode = 'burst'
@@ -5414,12 +5550,26 @@ windower.register_event('addon command', function(cmd, ...)
             windower.add_to_chat(207, '%s: MB Skillchain Mode: Off':format(_addon.name))
         end
         elseif cmd == 'steps' then
+        local p_steps = windower.ffxi.get_player()
+        if p_steps and p_steps.main_job ~= 'DNC' and p_steps.sub_job == 'DNC' then
+            -- /DNC sub: off (default) > Box Step only > Box>Quick rotation > off
+            dnc_sub_steps = (dnc_sub_steps + 1) % 3
+            dnc_step_index = 0
+            if dnc_sub_steps == 1 then
+                windower.add_to_chat(207, '%s: /DNC steps: On (Box Step only)':format(_addon.name))
+            elseif dnc_sub_steps == 2 then
+                windower.add_to_chat(207, '%s: /DNC steps: On (Box Step > Quickstep rotation)':format(_addon.name))
+            else
+                windower.add_to_chat(207, '%s: /DNC steps: Off':format(_addon.name))
+            end
+        else
         dnc_step_rotation_mode = not dnc_step_rotation_mode
         if dnc_step_rotation_mode then
             dnc_step_index = 0
             windower.add_to_chat(207, '%s: DNC step rotation: On':format(_addon.name))
         else
             windower.add_to_chat(207, '%s: DNC step rotation: Off':format(_addon.name))
+        end
         end
     elseif cmd == 'nosteps' then
         if nosteps == 0 then
@@ -5635,6 +5785,14 @@ elseif cmd == 'am' then
             sc_cascade_mode = 0
             windower.add_to_chat(207, '%s: Preburst Cascade Mode: Off':format(_addon.name))
         end
+    elseif cmd == 'futae' then
+        if sc_futae_mode == 0 then
+            sc_futae_mode = 1
+            windower.add_to_chat(207, '%s: Preburst Futae Mode: On':format(_addon.name))
+        else
+            sc_futae_mode = 0
+            windower.add_to_chat(207, '%s: Preburst Futae Mode: Off':format(_addon.name))
+        end
 
 elseif cmd == 'nukespam' or cmd == 'tierspam' then
     -- On NIN main, nukespam is a transparent alias for //sc wheel.
@@ -5651,6 +5809,8 @@ elseif cmd == 'nukespam' or cmd == 'tierspam' then
             wheel_last_spell = nil
             wheel_last_delay = 0
             wheel_cast_lock_until = 0
+            wheel_started_spell = nil
+            wheel_started_at = 0
             wheel_retry_clear()
             windower.add_to_chat(207, '%s: Wheel (San) Mode: On':format(_addon.name))
         else
@@ -5659,6 +5819,8 @@ elseif cmd == 'nukespam' or cmd == 'tierspam' then
             wheel_last_spell = nil
             wheel_last_delay = 0
             wheel_cast_lock_until = 0
+            wheel_started_spell = nil
+            wheel_started_at = 0
             wheel_retry_clear()
             windower.add_to_chat(207, '%s: Wheel (San) Mode: Off':format(_addon.name))
         end
@@ -5691,6 +5853,11 @@ elseif nukespam_mb_map[cmd] then
     else
         nukes.set_force_mb(wanted)
         nukespam_force_ele = nukespam_ele_for(wanted)
+        -- Setting a force resets no<ele> exclusions to default: forced-but-
+        -- excluded would otherwise cast nothing (wheel) / skip bursts.
+        if nukes.clear_exclusions() then
+            windower.add_to_chat(207, '%s: no<ele> exclusions cleared (element force set).':format(_addon.name))
+        end
         windower.add_to_chat(207, '%s: Burst element force: %s (nukespam: %s)':format(_addon.name, wanted, nukespam_force_ele))
     end
 elseif cmd == 'nomb' or cmd == 'mboff' or cmd == 'mbclear' then
@@ -5863,6 +6030,9 @@ elseif cmd == 'party' then
         if nosteps == 1 then
             windower.send_command('input /echo DNC Steps Off')
         end
+        if dnc_sub_steps > 0 then
+            windower.send_command('input /echo /DNC Steps: ' .. (dnc_sub_steps == 2 and 'Box Step > Quickstep rotation' or 'Box Step only'))
+        end
         if nopet == 1 then
             windower.send_command('input /echo BST Pet Automation Off')
         end
@@ -5943,16 +6113,18 @@ elseif cmd == 'party' then
         windower.add_to_chat(207, '  strict (only close with preferws) | ultimate (only close level 4)')
         windower.add_to_chat(207, '  party | partymb | partyam (combo shortcuts: auto+buddy [+mb/+am])')
         windower.add_to_chat(207, '  whilecasting | whilereadies (allow spam during casting/readying)')
-        windower.add_to_chat(207, '  steps (toggle DNC step rotation: Box Step > Quickstep > Feather Step)')
+        windower.add_to_chat(207, '  steps (toggle DNC step rotation: Box Step > Quickstep > Feather Step;')
+        windower.add_to_chat(207, '         on /DNC sub: cycles off > Box Step only > Box Step > Quickstep, no flourishes)')
         windower.add_to_chat(207, '  nosteps (toggle DNC steps off, flourishes still active)')
         windower.add_to_chat(207, '  nopet (toggle BST pet automation off)')
         windower.add_to_chat(207, '  weapon | bst | aeonic')
 
         windower.add_to_chat(207, ' Magic / Burst control:')
         windower.add_to_chat(207, '  mb | burst | am | autonuke | ebul(lience) | alac(rity) | cascade | nukespam | tierspam')
+        windower.add_to_chat(207, '  futae (preburst Futae, default off)')
         windower.add_to_chat(207, '  wheel (NIN elemental wheel) | nukedebug (nukespam debug output)')
         windower.add_to_chat(207, '  nomb | mboff | mbclear (clear forced burst element)')
-        windower.add_to_chat(207, '  <ele>mb (force burst element only, e.g. watermb/icemb/firemb/darkmb; repeat to clear)')
+        windower.add_to_chat(207, '  <ele>mb (force burst element only, e.g. watermb/icemb/firemb/darkmb; repeat to clear; setting a force clears no<ele> exclusions)')
         windower.add_to_chat(207, '  no<ele> (exclude element from bursting, e.g. nowater/noice/nofire; repeat to re-enable)')
         windower.add_to_chat(207, '  mana (reset burst element control: force off, all exclusions cleared)')
 

@@ -93,6 +93,7 @@ Skillchain behavior modifiers
     //sc ongo       Toggles Ongo mode (special case behavior in this addon).
     //sc nomb | mboff | mbclear    Clears any forced magic burst element.
     //sc <ele>mb     Forces bursting only the given element (e.g. watermb, icemb, firemb, darkmb); repeat to clear.
+                     Setting a force also clears any no<ele> exclusions, so a forced element is never fighting a stale exclusion.
     //sc no<ele>     Excludes an element from bursting (e.g. nowater, noice, nofire); repeat to re-enable.
     //sc mana        Resets burst element control entirely (force off, exclusions cleared).
     //sc ebul(lience) //sc alac(rity)    Toggle preburst Ebullience / Alacrity (SCH).
@@ -101,10 +102,14 @@ Skillchain behavior modifiers
     //sc tierspam    Toggles tiered nuke spam.
     //sc wheel       Toggles the NIN elemental wheel.
     //sc nukedebug   Toggles nukespam debug output.
+    //sc futae       Toggles preburst Futae (NIN, default off): weaves Futae before a wheel/nukespam burst when ready.
 
 DNC / BST specific
 
-    //sc steps       Toggles DNC step rotation (Box Step > Quickstep > Feather Step).
+    //sc steps       DNC main: toggles step rotation (Box Step > Quickstep > Feather Step).
+                     /DNC subjob: cycles off > Box Step only > Box Step + Quickstep rotation > off (off by default).
+                     The subjob mode weaves a step before spam/opener weaponskills with no Presto and no
+                     flourish usage (both above the subjob cap or deliberately unspent).
     //sc nosteps     Toggles DNC steps off (flourishes still active).
     //sc nopet       Toggles BST pet automation off.
     //sc bst         Toggles BST mode.

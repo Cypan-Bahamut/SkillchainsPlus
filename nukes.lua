@@ -158,6 +158,17 @@ function nukes.reset()
     XDark, XHoly = 0, 0
 end
 
+-- Clear only the no<ele> exclusions, leaving any forced element alone.
+-- Returns true if at least one exclusion was actually cleared. Used by
+-- skillchainsplus.lua's <ele>mb handler: setting a force resets exclusions to
+-- default so a forced element is never fighting a stale no<ele>.
+function nukes.clear_exclusions()
+    local had = (Earth + Water + Wind + Fire + Ice + Thunder + XDark + XHoly) > 0
+    Earth, Water, Wind, Fire, Ice, Thunder = 0, 0, 0, 0, 0, 0
+    XDark, XHoly = 0, 0
+    return had
+end
+
 -- Query the exclusion state for a normalized element (accepts synonyms via
 -- normalize_ele). Used by skillchainsplus.lua so nukespam and the NIN wheel honor
 -- the same no<ele> exclusions as burst selection.
