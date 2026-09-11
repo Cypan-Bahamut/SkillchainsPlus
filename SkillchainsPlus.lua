@@ -1950,7 +1950,9 @@ function check_results(reson)
                             if chainonews == nil then
                                 chainonelvl = chain[2]
                                 chainonews = chain[1]
-                            elseif chaintwows == nil then
+                            -- fallback slot: first non-Lv4 in list order, so an
+                            -- available Lv3 outranks Lv4 closers in plain auto
+                            elseif chaintwows == nil and chain[2] ~= "Lv.4" then
                                 chaintwolvl = chain[2]
                                 chaintwows = chain[1]
                             end
@@ -2054,7 +2056,8 @@ function check_results(reson)
                             rangedwsone = rangedchkcln
                             rangedlvlone = rangedchk[2]
                         end
-                    elseif rangedwstwo == nil then
+                    -- fallback slot: first non-Lv4, as in the melee scan above
+                    elseif rangedwstwo == nil and rangedchk[2] ~= "Lv.4" then
                         if sc_chain_allowed(rangedele) then
                             rangedwstwo = rangedchkcln
                             rangedlvltwo = rangedchk[2]
