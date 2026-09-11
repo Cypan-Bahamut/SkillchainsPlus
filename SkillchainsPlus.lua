@@ -1786,17 +1786,25 @@ function update_weapon()
     end
 end
 
+-- Ultimate SC minimum step by AM buff: AM1 four-step, AM2 three-step, AM3 any.
+local aeonic_am_min_step = {[270]=4, [271]=3, [272]=1}
 function aeonic_am(step)
     for x=270,272 do
         if buffs[info.player][x] then
-            return 272-x < step
+            return step >= aeonic_am_min_step[x]
         end
     end
     return false
 end
 
+-- Aeonic WS only carry their bonus property while any Aeonic Aftermath is up.
+function aeonic_am_up()
+    local b = buffs[info.player]
+    return b and (b[270] or b[271] or b[272]) and true or false
+end
+
 function aeonic_prop(ability, actor)
-    if ability.aeonic and (ability.weapon == info.aeonic and actor == info.player or settings.aeonic and info.player ~= actor) then
+    if ability.aeonic and (ability.weapon == info.aeonic and actor == info.player and aeonic_am_up() or settings.aeonic and info.player ~= actor) then
         return {ability.skillchain[1], ability.skillchain[2], ability.aeonic}
     end
     return ability.skillchain
@@ -2061,7 +2069,7 @@ function check_results(reson)
             elseif ultimate == 0 then
                 if rangedwstwo == nil then
                     autosc = rangedwsone
-                elseif rangedlvlone == "Lv.4" then
+                elseif rangedlvlone == "Lv.4" and rangedlvltwo ~= "Lv.4" then
                     autosc = rangedwstwo
                 else
                     autosc = rangedwsone
@@ -2087,7 +2095,7 @@ function check_results(reson)
             elseif ultimate == 0 then
                 if chaintwows == nil then
                     autosc = chainonews
-                elseif chainonelvl == "Lv.4" then
+                elseif chainonelvl == "Lv.4" and chaintwolvl ~= "Lv.4" then
                     autosc = chaintwows
                 else
                     autosc = chainonews
