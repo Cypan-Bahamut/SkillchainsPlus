@@ -1786,8 +1786,9 @@ function update_weapon()
     end
 end
 
--- Ultimate SC minimum step by AM buff: AM1 four-step, AM2 three-step, AM3 any.
-local aeonic_am_min_step = {[270]=4, [271]=3, [272]=1}
+-- Radiance/Umbra minimum (step = WS already done; closer is WS step+1):
+-- AM1 closes on the 4th WS, AM2 the 3rd, AM3 the 2nd. (Cy, 2026-09-11)
+local aeonic_am_min_step = {[270]=3, [271]=2, [272]=1}
 function aeonic_am(step)
     for x=270,272 do
         if buffs[info.player][x] then
@@ -1811,17 +1812,31 @@ function aeonic_prop(ability, actor)
 end
 
 function check_props(old, new)
-    for k = 1, #old do
-        local first = old[k]
-        local combo = sc_info[first]
-        for i = 1, #new do
-            local second = new[i]
-            local result = combo[second]
+    if #old > 3 then -- chainbound lists keep the legacy scan order
+        for k = 1, #old do
+            local first = old[k]
+            local combo = sc_info[first]
+            for i = 1, #new do
+                local second = new[i]
+                local result = combo[second]
+                if result then
+                    return unpack(result)
+                end
+                if combo.lvl == sc_info[second].lvl then
+                    break
+                end
+            end
+        end
+        return
+    end
+    -- Game pairing priority: the closing WS tries its own properties
+    -- left to right, each against the previous properties in order.
+    for i = 1, #new do
+        local second = new[i]
+        for k = 1, #old do
+            local result = sc_info[old[k]][second]
             if result then
                 return unpack(result)
-            end
-            if #old > 3 and combo.lvl == sc_info[second].lvl then
-                break
             end
         end
     end
