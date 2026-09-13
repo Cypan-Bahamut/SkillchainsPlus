@@ -5615,10 +5615,10 @@ windower.register_event('addon command', function(cmd, ...)
             starter = 0
             w_casting = 0
             w_readies = 0
-            windower.add_to_chat(207, '%s: Auto Skillchain Mode (core): On':format(_addon.name))
+            windower.add_to_chat(207, '%s: Auto Skillchain Mode: On':format(_addon.name))
         else
             auto = 0
-            windower.add_to_chat(207, '%s: Auto Skillchain Mode (core): Off':format(_addon.name))
+            windower.add_to_chat(207, '%s: Auto Skillchain Mode: Off':format(_addon.name))
         end
     elseif cmd == 'mb' then
         if burst == 0 then
@@ -5742,19 +5742,19 @@ elseif cmd == 'am' then
             ultimate = 0
             buddy = 0
             tagin = 0
-            windower.add_to_chat(207, '%s: Spam Weaponskill Mode (core): On':format(_addon.name))
+            windower.add_to_chat(207, '%s: Spam Weaponskill Mode: On':format(_addon.name))
         else
             spam = 0
-            windower.add_to_chat(207, '%s: Spam Weaponskill Mode (core): Off':format(_addon.name))
+            windower.add_to_chat(207, '%s: Spam Weaponskill Mode: Off':format(_addon.name))
         end
     elseif cmd == 'spamsc' then
         if spamsc == 0 then
             spamsc = 1
-            local hint = spam == 1 and '' or ' (dormant until spam mode is on)'
-            windower.add_to_chat(207, '%s: Spam Skillchain Overlay: On%s':format(_addon.name, hint))
+            local hint = spam == 1 and '' or ' (spam off)'
+            windower.add_to_chat(207, '%s: Spam Skillchain Mode: On%s':format(_addon.name, hint))
         else
             spamsc = 0
-            windower.add_to_chat(207, '%s: Spam Skillchain Overlay: Off':format(_addon.name))
+            windower.add_to_chat(207, '%s: Spam Skillchain Mode: Off':format(_addon.name))
         end
     elseif cmd == 'rotate' then
         if rotate == 0 then
@@ -5764,8 +5764,8 @@ elseif cmd == 'am' then
                 rotate = 1
                 rotate_index = 1
                 cleave = 0
-                local hint = spam == 1 and '' or ' (dormant until spam mode is on)'
-                windower.add_to_chat(207, '%s: Rotate Weaponskill Overlay: On (%d WS)%s':format(_addon.name, #rotate_usable, hint))
+                local hint = spam == 1 and '' or ', spam off'
+                windower.add_to_chat(207, '%s: Rotate Weaponskill Mode: On (%d WS%s)':format(_addon.name, #rotate_usable, hint))
                 for i = 1, #rotate_usable do
                     windower.add_to_chat(207, '  %d: %s':format(i, rotate_usable[i]))
                 end
@@ -5773,21 +5773,21 @@ elseif cmd == 'am' then
         else
             rotate = 0
             rotate_index = 1
-            windower.add_to_chat(207, '%s: Rotate Weaponskill Overlay: Off':format(_addon.name))
+            windower.add_to_chat(207, '%s: Rotate Weaponskill Mode: Off':format(_addon.name))
         end
     elseif cmd == 'nosc' then
         if nosc == 0 then
             nosc = 1
             local hint = ''
             if spam == 0 then
-                hint = ' (dormant until spam mode is on)'
+                hint = ' (spam off)'
             elseif spamsc == 1 then
-                hint = ' (suspended while spamsc overlay is on)'
+                hint = ' (spamsc on)'
             end
-            windower.add_to_chat(207, '%s: No-Skillchain Overlay: On%s':format(_addon.name, hint))
+            windower.add_to_chat(207, '%s: No-Skillchain Mode: On%s':format(_addon.name, hint))
         else
             nosc = 0
-            windower.add_to_chat(207, '%s: No-Skillchain Overlay: Off':format(_addon.name))
+            windower.add_to_chat(207, '%s: No-Skillchain Mode: Off':format(_addon.name))
         end
     elseif cmd == 'spamtp' then
         local val = tonumber((...))
@@ -5801,11 +5801,11 @@ elseif cmd == 'am' then
         if cleave == 0 then
             cleave = 1
             rotate = 0
-            local hint = spam == 1 and '' or ' (dormant until spam mode is on)'
-            windower.add_to_chat(207, '%s: Cleave Weaponskill Overlay: On%s':format(_addon.name, hint))
+            local hint = spam == 1 and '' or ' (spam off)'
+            windower.add_to_chat(207, '%s: Cleave Weaponskill Mode: On%s':format(_addon.name, hint))
         else
             cleave = 0
-            windower.add_to_chat(207, '%s: Cleave Weaponskill Overlay: Off':format(_addon.name))
+            windower.add_to_chat(207, '%s: Cleave Weaponskill Mode: Off':format(_addon.name))
         end
     elseif cmd == 'starter' then
         if starter == 0 then
@@ -6111,20 +6111,20 @@ elseif cmd == 'party' then
             windower.send_command('input /echo Spam TP Threshold: ' .. spamtp)
         end
         if spamsc == 1 then
-            windower.send_command('input /echo Spam Skillchain Overlay' .. (spam == 0 and ' (dormant)' or ''))
+            windower.send_command('input /echo Spam Skillchain Mode' .. (spam == 0 and ' (spam off)' or ''))
         end
         if nosc == 1 then
-            windower.send_command('input /echo No-Skillchain Overlay' .. (spam == 0 and ' (dormant)' or spamsc == 1 and ' (suspended by spamsc)' or ''))
+            windower.send_command('input /echo No-Skillchain Mode' .. (spam == 0 and ' (spam off)' or spamsc == 1 and ' (spamsc on)' or ''))
         end
         if rotate == 1 then
-            windower.send_command('input /echo Rotate Weaponskill Overlay (' .. #rotate_usable .. ' WS)' .. (spam == 0 and ' (dormant)' or ''))
+            windower.send_command('input /echo Rotate Weaponskill Mode (' .. #rotate_usable .. ' WS)' .. (spam == 0 and ' (spam off)' or ''))
             if #rotate_usable > 0 then
                 if rotate_index > #rotate_usable then rotate_index = 1 end
                 windower.send_command('input /echo Next: ' .. (rotate_usable[rotate_index] or '?'))
             end
         end
         if cleave == 1 then
-            windower.send_command('input /echo Cleave Weaponskill Overlay' .. (spam == 0 and ' (dormant)' or ''))
+            windower.send_command('input /echo Cleave Weaponskill Mode' .. (spam == 0 and ' (spam off)' or ''))
         end
         if starter == 1 then
             windower.send_command('input /echo Starter Weaponskill Mode')
@@ -6377,8 +6377,8 @@ elseif cmd == 'party' then
         else
             w_casting = 1
             wstrigger = 1
-            local hint = spam == 1 and '' or ' (dormant until spam mode is on)'
-            windower.add_to_chat(207, '%s: While Casting Overlay: On%s':format(_addon.name, hint))
+            local hint = spam == 1 and '' or ' (spam off)'
+            windower.add_to_chat(207, '%s: While Casting Mode: On%s':format(_addon.name, hint))
         end
     elseif cmd == 'whilereadies' then
         if w_readies == 1 then
@@ -6387,8 +6387,8 @@ elseif cmd == 'party' then
         else
             w_readies = 1
             wstrigger = 1
-            local hint = spam == 1 and '' or ' (dormant until spam mode is on)'
-            windower.add_to_chat(207, '%s: While Readying Overlay: On%s':format(_addon.name, hint))
+            local hint = spam == 1 and '' or ' (spam off)'
+            windower.add_to_chat(207, '%s: While Readying Mode: On%s':format(_addon.name, hint))
         end
     end
 end)
