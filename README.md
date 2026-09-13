@@ -1,19 +1,8 @@
-# skillchainsplus
+# Requirements
 
-Active battle skillchain display and automation for Windower.
+All files including the data folder, nukes, skills, and skillchainsplus are required to function correctly.
 
-Original addon: SkillChains by Ivaar. Modified by Cypan (Bahamut) and renamed
-skillchainsplus for distribution.
-
-## Installation
-
-Place the `skillchainsplus` folder in `Windower/addons/` and load with
-`//lua load skillchainsplus`. All files — `skillchainsplus.lua`, `skills.lua`,
-`nukes.lua`, and the `data` folder — are required to function correctly.
-
-Upon initial load, a new `<CharacterName>.lua` file is generated in the addon
-folder (copied from `data/auto.lua`) to allow character-specific weaponskill
-settings.
+Upon initial load, a new character.lua file will be generated to allow character specific weaponskill settings.
 
 # SkillChains (original addon)
 
@@ -53,96 +42,95 @@ More settings related to the text object can be found within the settings.xml ge
 
 # SkillChains Plus (Cypan modifications)
 
-Active battle skillchains automation.
+Active battle skillchain automation, structured as CORE MODES plus OVERLAYS.
 
-Primary automation and utility commands
+## Core modes
 
-    //sc spam        Spams defined spamws at 1000 TP.
-    //sc auto        Auto skillchaining using defaultws and tpws openers when no skillchain is available.
-    //sc autonuke    Auto magic bursts during the skillchain burst window.
-    //sc status      Displays active automation modes.
-    //sc reload      Reloads the addon and resets commands.
+Exactly one core mode drives weaponskills (or none = manual, display only).
+Turning a core on turns the other core off AND disarms the other core's
+overlays, so each mode starts clean. `//sc status` always leads with the
+active core.
 
-Party targeting helpers
+    //sc spam        Core: fires the picked weaponskill at the TP threshold (default 1000).
+    //sc auto        Core: opens and closes skillchains on window timing using defaultws/tpws.
 
-    //sc buddy           Waits for the engaged party member with highest TP to weaponskill.
-    //sc ignore <name>   Adds a party member to the ignore list for buddy logic.
-    //sc watch <name>    Removes a party member from the ignore list (inverse of ignore).
+## Overlays
 
-Skillchain behavior modifiers
+Overlays are armed and disarmed independently and never turn a core on.
+An overlay armed while its core is off sits dormant (the chat line says so)
+and wakes when its core turns on.
 
-    //sc prefer      Prioritizes preferws if a closing option exists.
-    //sc strict      Only closes skillchains if preferws is available.
-    //sc open        Only opens skillchains with defaultws and does not close.
-    //sc close       Only closes skillchains and does not open.
-    //sc endless     Forces using a level 2 or level 1 skillchain if available.
-    //sc spamsc      Spams defined spamws at 1000 TP but waits if spamws can close current skillchain.
-    //sc ultimate    Only closes if it can make a level 4 skillchain.
-    //sc starter     Uses starterws once per battle to open.
-    //sc melee       Forces only melee weaponskills for skillchains.
-    //sc ranged      Forces only ranged weaponskills for skillchains.
-    //sc cleave      Spam mode using cleavews instead of spamws.
-    //sc am          Maintains Aftermath 3 and prioritizes if not active.
-    //sc mb          Waits to skillchain until the end of the current skillchain window.
-    //sc innin       Maintains behind the mob position when not actively skillchaining.
-    //sc yonin       Maintains in front of the mob position when not actively skillchaining.
-    //sc light       Forces closing light based skillchains when available.
-    //sc dark        Forces closing dark based skillchains when available.
-    //sc whilecasting    Allows spam to trigger during casting.
-    //sc whilereadies    Allows spam to trigger during readying.
-    //sc ongo       Toggles Ongo mode (special case behavior in this addon).
-    //sc nomb | mboff | mbclear    Clears any forced magic burst element.
-    //sc <ele>mb     Forces bursting only the given element (e.g. watermb, icemb, firemb, darkmb); repeat to clear.
-                     Setting a force also clears any no<ele> exclusions, so a forced element is never fighting a stale exclusion.
-    //sc no<ele>     Excludes an element from bursting (e.g. nowater, noice, nofire); repeat to re-enable.
-    //sc mana        Resets burst element control entirely (force off, exclusions cleared).
-    //sc ebul(lience) //sc alac(rity)    Toggle preburst Ebullience / Alacrity (SCH).
-    //sc cascade     Toggles Cascade mode.
-    //sc nukespam    Toggles single-element nuke spam (NIN main: transparent alias for wheel).
-    //sc tierspam    Toggles tiered nuke spam.
-    //sc wheel       Toggles the NIN elemental wheel.
-    //sc nukedebug   Toggles nukespam debug output.
-    //sc futae       Toggles preburst Futae (NIN, default off): weaves Futae before a wheel/nukespam burst when ready.
+Spam-scoped overlays (cleared when auto turns on)
 
-DNC / BST specific
+    //sc spamsc      Hold the spam WS to CLOSE a skillchain at the end of the window.
+    //sc nosc        Hold the spam WS whenever it WOULD form a skillchain - spam without
+                     ever chaining. Suspended while spamsc is armed (spamsc wins); fires
+                     freely during the pre-window delay and after the window expires.
+    //sc rotate      Pick the spam WS from your rotatews list in order. Advances only when
+                     the WS actually goes off (a rejected send never skips a slot).
+                     Mutually exclusive with cleave.
+    //sc cleave      Pick the AoE cleave WS instead of spamws. Mutually exclusive with rotate.
+    //sc starter     Use starterws once per battle to open.
+    //sc spamtp <1000-3000>   TP threshold for spam (parameter, not a toggle).
+    //sc whilecasting | whilereadies   Allow spam to trigger during casting/readying.
 
-    //sc steps       DNC main: toggles step rotation (Box Step > Quickstep > Feather Step).
-                     /DNC subjob: cycles off > Box Step only > Box Step + Quickstep rotation > off (off by default).
-                     The subjob mode weaves a step before spam/opener weaponskills with no Presto and no
-                     flourish usage (both above the subjob cap or deliberately unspent).
-    //sc nosteps     Toggles DNC steps off (flourishes still active).
-    //sc nopet       Toggles BST pet automation off.
-    //sc bst         Toggles BST mode.
+Auto-scoped overlays (cleared when spam turns on)
 
-Positioning
+    //sc open        Only open skillchains, never close.
+    //sc close       Only close skillchains, never open.
+    //sc prefer      Prioritize preferws if a closing option exists.
+    //sc strict      Only close skillchains if preferws is available.
+    //sc ultimate    Only close if it can make a level 4 skillchain.
+    //sc buddy       Wait for the engaged party member with highest TP to weaponskill.
 
-    //sc innin | yonin      Simple strafe (behind / in front).
-    //sc face | rear        Front + approach / behind + approach.
-    //sc pet | petface      Pet side / pet side + approach.
+Cross-scope overlays (read by both cores; survive core switches)
 
-Runtime WS list editing
+    //sc mb          Wait to skillchain until the end of the current window (burst setups).
+    //sc am          Maintain Aftermath 3 and prioritize it if not active.
+    //sc autonuke    Auto magic burst during the skillchain burst window.
+    //sc light | dark | <element>   Restrict which skillchains the automation will make.
 
-    //sc wslist                       Lists the current WS lists.
-    //sc wsadd <list> <weaponskill>   Adds a WS to a list (runtime only).
-    //sc wsrm  <list> <weaponskill>   Removes a WS from a list (runtime only; wsremove also works).
-                                      Use //sc reload to reset to the saved configuration.
+Global modifiers
 
-Combination mode shortcuts
+    //sc melee       Force only melee weaponskills.
+    //sc ranged      Force only ranged weaponskills.
+    //sc endless     Force a level 1/2 skillchain if available.
+    //sc steps | nosteps | nopet    DNC step and BST pet automation toggles.
 
-    //sc party       auto + buddy
-    //sc partymb     auto + buddy + mb
-    //sc partyam     auto + buddy + am
+## Combination shortcuts
 
-Manual trigger macros
+    //sc party       auto core + buddy
+    //sc partymb     auto core + buddy + mb
+    //sc partyam     auto core + buddy + am
 
-    /console sc autoskill    Closes the current skillchain with the selected weaponskill.
-    /console sc spamskill    Uses the zergws weaponskill, if defined.
-    /console sc autoburst    Attempts to magic burst using the currently selected burst mode.
+These are auto core entries: they disarm all spam-scoped overlays like //sc auto does.
 
-Internal utility
+## Weaponskill lists (runtime editing)
 
-    //sc nuking    Resets the internal autonuke lockout flag (used by autonuke timing).
-    //sc eval      Runs a Lua expression (developer use).
+    //sc wslist                       Show all lists for the current job.
+    //sc wsadd <list> <weaponskill>   Add to the front of a list.
+    //sc wsrm <list> <weaponskill>    Remove from a list (alias: wsremove).
+
+Lists: defaultws, tpws, spamws, starterws, preferws, avoidws, petws, amws, rotatews.
+rotatews feeds //sc rotate; entries must match the weaponskill's exact English name.
+Runtime edits last until //sc reload.
+
+## Positioning
+
+    //sc innin | yonin           Behind / in front of the mob (simple strafe).
+    //sc face | rear             Front / behind with approach.
+    //sc pet | petface           Pet side, without / with approach.
+
+## Party targeting helpers
+
+    //sc ignore <name>   Add a party member to the ignore list for buddy logic.
+    //sc watch <name>    Remove a party member from the ignore list.
+
+## Manual trigger macros
+
+    /console sc autoskill    Close the current skillchain with the selected weaponskill.
+    /console sc spamskill    Use the zergws weaponskill, if defined.
+    /console sc autoburst    Attempt a magic burst using the current burst mode.
 
 # Nukes addon (separate)
 
@@ -178,12 +166,3 @@ Element toggles (exclude an element from selection)
     //nukes nothunder
     //nukes nodark
     //nukes nolight
-
-## Support
-
-First and foremost: Please support the original author if this is an addon modification. 
-If you enjoy the addon and you'd like to buy me a coffee, it's appreciated but never expected:
-
-[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-cypan-FFDD00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/cypan)
-
-Bug reports and pull requests are worth more than donations, so open an issue if something's broken please.

@@ -43,7 +43,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 _addon.author = 'Ivaar; Modified by Cypan (Bahamut)'
 _addon.command = 'sc'
 _addon.name = 'skillchainsplus'
-_addon.version = '2.3'
+_addon.version = '2.4'
 
 require('luau')
 require('pack')
@@ -593,6 +593,25 @@ local function sc_spamsc_should_fire(ws_name, req_tp, cur_tp, reson, now)
     end
 
     return false, true, prop
+end
+
+-- //sc nosc (Cy ruling 2026-09-12): true when firing ws_name now would form
+-- a skillchain per the resonance model. Ignores sc_chain_allowed on purpose —
+-- a chain the light/dark/element filters would skip still forms in game.
+-- Pre-delay is free: inside reson.delay a WS cannot chain, so spam fires.
+-- Past delay it holds only while the WS would pair, until the window closes
+-- or another WS resets resonance and opens a fresh pre-delay period.
+local function sc_nosc_would_chain(ws_name, reson, now)
+    if not ws_name or not reson or reson.closed or not reson.active then return false end
+    if now <= (reson.delay or 0) then return false end
+    if ((reson.times or 0) - now) <= 0 then return false end
+    local ws = res and res.weapon_skills and (res.weapon_skills:with('en', ws_name) or res.weapon_skills:with('name', ws_name)) or nil
+    local wsid = ws and tonumber(ws.id) or nil
+    if not wsid then return false end
+    local ability = skills and skills.weapon_skills and skills.weapon_skills[wsid] or nil
+    if not ability then return false end
+    local _, prop = check_props(reson.active, aeonic_prop(ability, info and info.player or nil))
+    return prop ~= nil
 end
 -- Finishing Move count (0..6 where 6 represents 6+)
 local function dnc_finishing_moves()
@@ -1186,6 +1205,7 @@ function varclean()
     spam = 0
     spamsc = 0
     spamtp = 1000
+    nosc = 0
     rotate = 0
     rotate_index = 1
     rotate_usable = {}
@@ -1361,10 +1381,12 @@ function check_sc()
             if skills.is_ranged_ws(defaultws[i]) then
                 for s = 1,#abilities,+1 do
                     if openws == nil then
-                        local wsid = res.weapon_skills:with('en',defaultws[i]).id
-                        local wsid = tonumber(wsid)
-                        if abilities[s] == wsid then
-                            openws = defaultws[i]
+                        local ws_res = res.weapon_skills:with('en',defaultws[i])
+                        if ws_res then
+                            local wsid = tonumber(ws_res.id)
+                            if abilities[s] == wsid then
+                                openws = defaultws[i]
+                            end
                         end
                     end
                 end
@@ -1378,10 +1400,12 @@ function check_sc()
             for s = 1,#abilities,+1 do
                 if overws == nil then
                     if skills.is_ranged_ws(tpws[i]) then
-                        local wsid = res.weapon_skills:with('en',tpws[i]).id
-                        local wsid = tonumber(wsid)
-                        if abilities[s] == wsid then
-                            overws = tpws[i]
+                        local ws_res = res.weapon_skills:with('en',tpws[i])
+                        if ws_res then
+                            local wsid = tonumber(ws_res.id)
+                            if abilities[s] == wsid then
+                                overws = tpws[i]
+                            end
                         end
                     end
                 end
@@ -1391,10 +1415,12 @@ function check_sc()
             if skills.is_ranged_ws(spamws[i]) then
                 for s = 1,#abilities,+1 do
                     if zergws == nil then
-                        local wsid =  res.weapon_skills:with('en',spamws[i]).id
-                        local wsid = tonumber(wsid)
-                        if abilities[s] == wsid then
-                            zergws = spamws[i]
+                        local ws_res = res.weapon_skills:with('en',spamws[i])
+                        if ws_res then
+                            local wsid = tonumber(ws_res.id)
+                            if abilities[s] == wsid then
+                                zergws = spamws[i]
+                            end
                         end
                     end
                 end
@@ -1418,10 +1444,12 @@ function check_sc()
             if skills.is_ranged_ws(starterws[i]) then
                 for s = 1,#abilities,+1 do
                     if initws == nil then
-                        local wsid =  res.weapon_skills:with('en',starterws[i]).id
-                        local wsid = tonumber(wsid)
-                        if abilities[s] == wsid then
-                            initws = starterws[i]
+                        local ws_res = res.weapon_skills:with('en',starterws[i])
+                        if ws_res then
+                            local wsid = tonumber(ws_res.id)
+                            if abilities[s] == wsid then
+                                initws = starterws[i]
+                            end
                         end
                     end
                 end
@@ -1444,10 +1472,12 @@ function check_sc()
         for i = 1,#tpws,+1 do
             for s = 1,#abilities,+1 do
                 if overws == nil then
-                    local wsid =  res.weapon_skills:with('en',tpws[i]).id
-                    local wsid = tonumber(wsid)
-                    if abilities[s] == wsid then
-                        overws = tpws[i]
+                    local ws_res = res.weapon_skills:with('en',tpws[i])
+                    if ws_res then
+                        local wsid = tonumber(ws_res.id)
+                        if abilities[s] == wsid then
+                            overws = tpws[i]
+                        end
                     end
                 end
             end
@@ -1455,10 +1485,12 @@ function check_sc()
         for i = 1,#spamws,+1 do
             for s = 1,#abilities,+1 do
                 if zergws == nil then
-                    local wsid =  res.weapon_skills:with('en',spamws[i]).id
-                    local wsid = tonumber(wsid)
-                    if abilities[s] == wsid then
-                        zergws = spamws[i]
+                    local ws_res = res.weapon_skills:with('en',spamws[i])
+                    if ws_res then
+                        local wsid = tonumber(ws_res.id)
+                        if abilities[s] == wsid then
+                            zergws = spamws[i]
+                        end
                     end
                 end
             end
@@ -1492,10 +1524,12 @@ function check_sc()
         for i = 1,#starterws,+1 do
             for s = 1,#abilities,+1 do
                 if initws == nil then
-                    local wsid =  res.weapon_skills:with('en',starterws[i]).id
-                    local wsid = tonumber(wsid)
-                    if abilities[s] == wsid then
-                        initws = starterws[i]
+                    local ws_res = res.weapon_skills:with('en',starterws[i])
+                    if ws_res then
+                        local wsid = tonumber(ws_res.id)
+                        if abilities[s] == wsid then
+                            initws = starterws[i]
+                        end
                     end
                 end
             end
@@ -3600,6 +3634,10 @@ windower.register_event('prerender', function()
 
                     if ws_to_use ~= nil then
                         should_fire, holding_for_sc = sc_spamsc_should_fire(ws_to_use, req_tp, tp, reson, now)
+                        if nosc == 1 and spamsc ~= 1 and should_fire and sc_nosc_would_chain(ws_to_use, reson, now) then
+                            should_fire = false
+                            holding_for_sc = true
+                        end
                     end
 
                     if should_fire then
@@ -3630,11 +3668,7 @@ windower.register_event('prerender', function()
                                 -- Either no pet pre-WS needed, or delay has elapsed
                                 bst_spam_pet_sent_at = 0
                                 dnc_ws_context = 'spam'
-                                local pre_ws_inflight = ws_inflight_time or 0
                                 perform_ws(ws_to_use)
-                                if rotate == 1 and #rotate_usable > 0 and (ws_inflight_time or 0) ~= pre_ws_inflight then
-                                    rotate_index = (rotate_index % #rotate_usable) + 1
-                                end
                                 if ws_to_use == zergws then
                                     wstrigger = 1
                                 elseif ws_to_use == initws then
@@ -3910,7 +3944,7 @@ windower.register_event(
             -- Only treat damage as confirmation for a cast that actually
             -- started (latch set for it). Without this, unrelated party or
             -- trust damage lines inside the 3.5s window can confirm — and
-            -- advance past — a send that was never accepted (e.g. "Cypan
+            -- advance past — a send that was never accepted (e.g. "Player
             -- takes 0 points of damage" landing during a failed-send bridge).
             if is_spell_dmg and wheel_started_spell == wheel_send_spell then
                 local spell = wheel_send_spell
@@ -5446,6 +5480,15 @@ local target = actionpacket:get_targets()()
     if category == 'weaponskill_finish' and actor == info.player then
         ws_clear_inflight()
         ws_delay(2.0)  -- success cooldown only
+        -- rotate advances here, on the WS actually going off — never on a
+        -- send attempt (Cy ruling 2026-09-12; a rejected send must not
+        -- consume a ring slot).
+        if spam == 1 and rotate == 1 and #rotate_usable > 0 then
+            local fin = res[resource] and res[resource][action_id]
+            if fin and fin.en == rotate_usable[rotate_index] then
+                rotate_index = (rotate_index % #rotate_usable) + 1
+            end
+        end
     end
 
 
@@ -5557,15 +5600,25 @@ windower.register_event('addon command', function(cmd, ...)
     elseif cmd == 'eval' then
         assert(loadstring(table.concat({...}, ' ')))()
     elseif cmd == 'auto' then
+        -- CORE mode. Entering a core disarms the OTHER core's overlays
+        -- (D-SC-CORE-CLEAN, Cy 2026-09-12): auto entry drops every
+        -- spam-scoped overlay. Cross-scope arms (am, burst, autonuke,
+        -- light/dark/ele filters) are read by both cores and stay.
         if auto == 0 then
             auto = 1
             spam = 0
-            cleave = 0
+            spamsc = 0
+            nosc = 0
             rotate = 0
-            windower.add_to_chat(207, '%s: Auto Skillchain Mode: On':format(_addon.name))
+            rotate_index = 1
+            cleave = 0
+            starter = 0
+            w_casting = 0
+            w_readies = 0
+            windower.add_to_chat(207, '%s: Auto Skillchain Mode (core): On':format(_addon.name))
         else
             auto = 0
-            windower.add_to_chat(207, '%s: Auto Skillchain Mode: Off':format(_addon.name))
+            windower.add_to_chat(207, '%s: Auto Skillchain Mode (core): Off':format(_addon.name))
         end
     elseif cmd == 'mb' then
         if burst == 0 then
@@ -5674,34 +5727,34 @@ elseif cmd == 'am' then
             windower.add_to_chat(207, '%s: Close Skillchain Mode: Off':format(_addon.name))
         end
     elseif cmd == 'spam' then
-        if spam == 0 or spamsc == 1 or rotate == 1 then
+        -- CORE mode. Entering a core disarms the OTHER core's overlays
+        -- (D-SC-CORE-CLEAN, Cy 2026-09-12): spam entry drops the auto-scoped
+        -- overlays. Cross-scope arms (am, burst, autonuke, light/dark/ele
+        -- filters) are read by both cores and stay. Spam overlays armed
+        -- while manual (spamsc/nosc/rotate/cleave/starter) wake here.
+        if spam == 0 then
             spam = 1
-            spamsc = 0
             auto = 0
             open = 0
             close = 0
-            cleave = 0
-            rotate = 0
-            windower.add_to_chat(207, '%s: Spam Weaponskill Mode: On':format(_addon.name))
+            prefer = 0
+            strict = 0
+            ultimate = 0
+            buddy = 0
+            tagin = 0
+            windower.add_to_chat(207, '%s: Spam Weaponskill Mode (core): On':format(_addon.name))
         else
             spam = 0
-            spamsc = 0
-            windower.add_to_chat(207, '%s: Spam Weaponskill Mode: Off':format(_addon.name))
+            windower.add_to_chat(207, '%s: Spam Weaponskill Mode (core): Off':format(_addon.name))
         end
     elseif cmd == 'spamsc' then
         if spamsc == 0 then
             spamsc = 1
-            spam = 1
-            auto = 0
-            open = 0
-            close = 0
-            cleave = 0
-            rotate = 0
-            windower.add_to_chat(207, '%s: Spam Skillchain Mode: On':format(_addon.name))
+            local hint = spam == 1 and '' or ' (dormant until spam mode is on)'
+            windower.add_to_chat(207, '%s: Spam Skillchain Overlay: On%s':format(_addon.name, hint))
         else
             spamsc = 0
-            spam = 0
-            windower.add_to_chat(207, '%s: Spam Skillchain Mode: Off':format(_addon.name))
+            windower.add_to_chat(207, '%s: Spam Skillchain Overlay: Off':format(_addon.name))
         end
     elseif cmd == 'rotate' then
         if rotate == 0 then
@@ -5710,13 +5763,9 @@ elseif cmd == 'am' then
             else
                 rotate = 1
                 rotate_index = 1
-                spam = 1
-                spamsc = 0
-                auto = 0
-                open = 0
-                close = 0
                 cleave = 0
-                windower.add_to_chat(207, '%s: Rotate Weaponskill Mode: On (%d WS)':format(_addon.name, #rotate_usable))
+                local hint = spam == 1 and '' or ' (dormant until spam mode is on)'
+                windower.add_to_chat(207, '%s: Rotate Weaponskill Overlay: On (%d WS)%s':format(_addon.name, #rotate_usable, hint))
                 for i = 1, #rotate_usable do
                     windower.add_to_chat(207, '  %d: %s':format(i, rotate_usable[i]))
                 end
@@ -5724,8 +5773,21 @@ elseif cmd == 'am' then
         else
             rotate = 0
             rotate_index = 1
-            spam = 0
-            windower.add_to_chat(207, '%s: Rotate Weaponskill Mode: Off':format(_addon.name))
+            windower.add_to_chat(207, '%s: Rotate Weaponskill Overlay: Off':format(_addon.name))
+        end
+    elseif cmd == 'nosc' then
+        if nosc == 0 then
+            nosc = 1
+            local hint = ''
+            if spam == 0 then
+                hint = ' (dormant until spam mode is on)'
+            elseif spamsc == 1 then
+                hint = ' (suspended while spamsc overlay is on)'
+            end
+            windower.add_to_chat(207, '%s: No-Skillchain Overlay: On%s':format(_addon.name, hint))
+        else
+            nosc = 0
+            windower.add_to_chat(207, '%s: No-Skillchain Overlay: Off':format(_addon.name))
         end
     elseif cmd == 'spamtp' then
         local val = tonumber((...))
@@ -5737,21 +5799,13 @@ elseif cmd == 'am' then
         end
     elseif cmd == 'cleave' then
         if cleave == 0 then
-            spamsc = 0
+            cleave = 1
             rotate = 0
-            if spam == 0 then
-                spam = 1
-                auto = 0
-                open = 0
-                close = 0
-                cleave = 1
-            else
-                cleave = 1
-            end
-            windower.add_to_chat(207, '%s: Cleave Weaponskill Mode: On':format(_addon.name))
+            local hint = spam == 1 and '' or ' (dormant until spam mode is on)'
+            windower.add_to_chat(207, '%s: Cleave Weaponskill Overlay: On%s':format(_addon.name, hint))
         else
             cleave = 0
-            windower.add_to_chat(207, '%s: Cleave Weaponskill Mode: Off':format(_addon.name))
+            windower.add_to_chat(207, '%s: Cleave Weaponskill Overlay: Off':format(_addon.name))
         end
     elseif cmd == 'starter' then
         if starter == 0 then
@@ -5929,7 +5983,13 @@ elseif cmd == 'party' then
             auto = 1
             spam = 0
             spamsc = 0
+            nosc = 0
             rotate = 0
+            rotate_index = 1
+            cleave = 0
+            starter = 0
+            w_casting = 0
+            w_readies = 0
             windower.add_to_chat(207, '%s: Auto Skillchain Mode: On':format(_addon.name))
         end
     elseif cmd == 'partyam' then
@@ -5941,7 +6001,13 @@ elseif cmd == 'party' then
             auto = 1
             spam = 0
             spamsc = 0
+            nosc = 0
             rotate = 0
+            rotate_index = 1
+            cleave = 0
+            starter = 0
+            w_casting = 0
+            w_readies = 0
             windower.add_to_chat(207, '%s: Auto Skillchain Mode: On':format(_addon.name))
         end
         if am == 0 then
@@ -5957,7 +6023,13 @@ elseif cmd == 'party' then
               auto = 1
               spam = 0
               spamsc = 0
+              nosc = 0
               rotate = 0
+              rotate_index = 1
+              cleave = 0
+              starter = 0
+              w_casting = 0
+              w_readies = 0
               windower.add_to_chat(207, '%s: Auto Skillchain Mode: On':format(_addon.name))
           end
           if burst == 0 then
@@ -6033,22 +6105,26 @@ elseif cmd == 'party' then
         if buddy == 1 then
             windower.send_command('input /echo Buddy Skillchain Mode')
         end
+        windower.send_command('input /echo Core: ' .. (auto == 1 and 'Auto' or spam == 1 and 'Spam' or 'Manual'))
         if spam == 1 then
             windower.send_command('input /echo Spam Weaponskill Mode')
             windower.send_command('input /echo Spam TP Threshold: ' .. spamtp)
         end
         if spamsc == 1 then
-            windower.send_command('input /echo Spam Skillchain Mode')
+            windower.send_command('input /echo Spam Skillchain Overlay' .. (spam == 0 and ' (dormant)' or ''))
+        end
+        if nosc == 1 then
+            windower.send_command('input /echo No-Skillchain Overlay' .. (spam == 0 and ' (dormant)' or spamsc == 1 and ' (suspended by spamsc)' or ''))
         end
         if rotate == 1 then
-            windower.send_command('input /echo Rotate Weaponskill Mode (' .. #rotate_usable .. ' WS)')
+            windower.send_command('input /echo Rotate Weaponskill Overlay (' .. #rotate_usable .. ' WS)' .. (spam == 0 and ' (dormant)' or ''))
             if #rotate_usable > 0 then
                 if rotate_index > #rotate_usable then rotate_index = 1 end
                 windower.send_command('input /echo Next: ' .. (rotate_usable[rotate_index] or '?'))
             end
         end
         if cleave == 1 then
-            windower.send_command('input /echo Cleave Weaponskill Mode')
+            windower.send_command('input /echo Cleave Weaponskill Overlay' .. (spam == 0 and ' (dormant)' or ''))
         end
         if starter == 1 then
             windower.send_command('input /echo Starter Weaponskill Mode')
@@ -6134,8 +6210,9 @@ elseif cmd == 'party' then
         windower.add_to_chat(207, ' Combat modes:')
         windower.add_to_chat(207, '  auto | melee | ranged | endless')
 
-        windower.add_to_chat(207, ' Skillchains / WS control:')
-        windower.add_to_chat(207, '  spam | spamsc | spamtp <1000-3000> | rotate | cleave | starter | prefer | buddy')
+        windower.add_to_chat(207, ' Skillchains / WS control (spam and auto are CORE modes; the rest are overlays):')
+        windower.add_to_chat(207, '  spam | spamsc (close chains) | nosc (never cause a chain) | spamtp <1000-3000>')
+        windower.add_to_chat(207, '  rotate | cleave (WS pickers, mutually exclusive) | starter | prefer | buddy')
         windower.add_to_chat(207, '  strict (only close with preferws) | ultimate (only close level 4)')
         windower.add_to_chat(207, '  party | partymb | partyam (combo shortcuts: auto+buddy [+mb/+am])')
         windower.add_to_chat(207, '  whilecasting | whilereadies (allow spam during casting/readying)')
@@ -6149,9 +6226,9 @@ elseif cmd == 'party' then
         windower.add_to_chat(207, '  mb | burst | am | autonuke | ebul(lience) | alac(rity) | cascade | nukespam | tierspam')
         windower.add_to_chat(207, '  futae (preburst Futae, default off)')
         windower.add_to_chat(207, '  wheel (NIN elemental wheel) | nukedebug (nukespam debug output)')
-        windower.add_to_chat(207, '  nomb | mboff | mbclear (clear forced burst element)')
         windower.add_to_chat(207, '  <ele>mb (force burst element only, e.g. watermb/icemb/firemb/darkmb; repeat to clear; setting a force clears no<ele> exclusions)')
         windower.add_to_chat(207, '  no<ele> (exclude element from bursting, e.g. nowater/noice/nofire; repeat to re-enable)')
+        windower.add_to_chat(207, '  nomb | mboff | mbclear (clear forced burst element)')
         windower.add_to_chat(207, '  mana (reset burst element control: force off, all exclusions cleared)')
 
         windower.add_to_chat(207, ' Lists / Filters:')
@@ -6300,13 +6377,8 @@ elseif cmd == 'party' then
         else
             w_casting = 1
             wstrigger = 1
-            spam = 1
-            spamsc = 0
-            rotate = 0
-            auto = 0
-            open = 0
-            close = 0
-            windower.add_to_chat(207, '%s: While Casting Mode: On':format(_addon.name))
+            local hint = spam == 1 and '' or ' (dormant until spam mode is on)'
+            windower.add_to_chat(207, '%s: While Casting Overlay: On%s':format(_addon.name, hint))
         end
     elseif cmd == 'whilereadies' then
         if w_readies == 1 then
@@ -6315,13 +6387,8 @@ elseif cmd == 'party' then
         else
             w_readies = 1
             wstrigger = 1
-            spam = 1
-            spamsc = 0
-            rotate = 0
-            auto = 0
-            open = 0
-            close = 0
-            windower.add_to_chat(207, '%s: While Readying Mode: On':format(_addon.name))
+            local hint = spam == 1 and '' or ' (dormant until spam mode is on)'
+            windower.add_to_chat(207, '%s: While Readying Overlay: On%s':format(_addon.name, hint))
         end
     end
 end)
